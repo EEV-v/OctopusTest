@@ -1,158 +1,234 @@
-﻿[CmdletBinding()]
+##########################################################################
+# This is the Cake bootstrapper script for PowerShell.
+# This file was downloaded from https://github.com/cake-build/resources
+# Feel free to change this file to fit your needs.
+##########################################################################
+
+<#
+
+.SYNOPSIS
+This is a Powershell script to bootstrap a Cake build.
+
+.DESCRIPTION
+This Powershell script will download NuGet if missing, restore NuGet tools (including Cake)
+and execute your Cake build script with the parameters you provide.
+
+.PARAMETER Script
+The build script to execute.
+.PARAMETER Target
+The build script target to run.
+.PARAMETER Configuration
+The build configuration to use.
+.PARAMETER Verbosity
+Specifies the amount of information to be displayed.
+.PARAMETER ShowDescription
+Shows description about tasks.
+.PARAMETER DryRun
+Performs a dry run.
+.PARAMETER Experimental
+Uses the nightly builds of the Roslyn script engine.
+.PARAMETER Mono
+Uses the Mono Compiler rather than the Roslyn script engine.
+.PARAMETER SkipToolPackageRestore
+Skips restoring of packages.
+.PARAMETER ScriptArgs
+Remaining arguments are added here.
+
+.LINK
+https://cakebuild.net
+
+#>
+
+[CmdletBinding()]
 Param(
     [string]$Script = "build.cake",
-    [string]$Target = "Default",
-    [ValidateSet("Release", "Debug")]
-    [string]$Configuration = "Release",
+    [string]$Target,
+    [string]$Configuration,
     [ValidateSet("Quiet", "Minimal", "Normal", "Verbose", "Diagnostic")]
-    [string]$Verbosity = "Normal",
-    [string]$NuGetFeeds = "",
-    [string]$DockerSource = "",
-    [Parameter(Position=0, Mandatory=$false, ValueFromRemainingArguments=$true)]
+    [string]$Verbosity,
+    [switch]$ShowDescription,
+    [Alias("WhatIf", "Noop")]
+    [switch]$DryRun,
+    [switch]$Experimental,
+    [switch]$Mono,
+    [switch]$SkipToolPackageRestore,
+    [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
     [string[]]$ScriptArgs
 )
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-function Unzip {
-    Param(
-        [string]$zipfile,
-        [string]$outpath
-    )
+[Reflection.Assembly]::LoadWithPartialName("System.Security") | Out-Null
+function MD5HashFile([string] $filePath)
+{
+    if ([string]::IsNullOrEmpty($filePath) -or !(Test-Path $filePath -PathType Leaf))
+    {
+        return $null
+    }
 
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
+    [System.IO.Stream] $file = $null;
+    [System.Security.Cryptography.MD5] $md5 = $null;
+    try
+    {
+        $md5 = [System.Security.Cryptography.MD5]::Create()
+        $file = [System.IO.File]::OpenRead($filePath)
+        return [System.BitConverter]::ToString($md5.ComputeHash($file))
+    }
+    finally
+    {
+        if ($file -ne $null)
+        {
+            $file.Dispose()
+        }
+    }
 }
 
-function EscapeParameter {
-    Param (
-        [string]$parameter
-    )
-    $index = $parameter.IndexOf('=')
-
-    return "$($parameter.Substring(0, $index))=`"$($parameter.Substring($index + 1))`""
+function GetProxyEnabledWebClient
+{
+    $wc = New-Object System.Net.WebClient
+    $proxy = [System.Net.WebRequest]::GetSystemWebProxy()
+    $proxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials        
+    $wc.Proxy = $proxy
+    return $wc
 }
 
-$IsRunningOnLinux = $IsLinux -eq $true #IsLinux exists only when running on PowerShell Core, classic PowerShell will return $null
+Write-Host "Preparing to run build script..."
 
-Write-Output "Preparing to run build script."
-
-if ($DockerSource -eq "") {
-    $DockerSource = $env:R1_DOCKER_REGISTRY
+if(!$PSScriptRoot){
+    $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 }
 
-$CAKE_ROOT = $pwd
-$CAKE_CACHE_ROOT = $CAKE_ROOT
-$TOOLS_DIR = Join-Path $CAKE_CACHE_ROOT "tools"
-$CAKE_VERSION = Get-Content $(Join-Path $pwd "cake.version")
-$CAKE_PACKAGE = "Cake.CoreCLR"
-$CAKE_DIRECTORY = Join-Path $TOOLS_DIR $CAKE_PACKAGE
-$CAKE_EXE = Join-Path $CAKE_DIRECTORY "Cake.dll"
-
+$TOOLS_DIR = Join-Path $PSScriptRoot "tools"
 $ADDINS_DIR = Join-Path $TOOLS_DIR "Addins"
 $MODULES_DIR = Join-Path $TOOLS_DIR "Modules"
+$NUGET_EXE = Join-Path $TOOLS_DIR "nuget.exe"
+$CAKE_EXE = Join-Path $TOOLS_DIR "Cake/Cake.exe"
+$NUGET_URL = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+$PACKAGES_CONFIG = Join-Path $TOOLS_DIR "packages.config"
+$PACKAGES_CONFIG_MD5 = Join-Path $TOOLS_DIR "packages.config.md5sum"
+$ADDINS_PACKAGES_CONFIG = Join-Path $ADDINS_DIR "packages.config"
+$MODULES_PACKAGES_CONFIG = Join-Path $MODULES_DIR "packages.config"
 
-if (-not (Test-Path $TOOLS_DIR)) {
-    New-Item -Path $TOOLS_DIR -Type Directory | Out-Null
+# Make sure tools folder exists
+if ((Test-Path $PSScriptRoot) -and !(Test-Path $TOOLS_DIR)) {
+    Write-Verbose -Message "Creating tools directory..."
+    New-Item -Path $TOOLS_DIR -Type directory | out-null
 }
 
-if (-not (Test-Path $CAKE_EXE)) {
+# Make sure that packages.config exist.
+if (!(Test-Path $PACKAGES_CONFIG)) {
+    Write-Verbose -Message "Downloading packages.config..."    
+    try {        
+        $wc = GetProxyEnabledWebClient
+        $wc.DownloadFile("https://cakebuild.net/download/bootstrapper/packages", $PACKAGES_CONFIG) } catch {
+        Throw "Could not download packages.config."
+    }
+}
+
+# Try find NuGet.exe in path if not exists
+if (!(Test-Path $NUGET_EXE)) {
+    Write-Verbose -Message "Trying to find nuget.exe in PATH..."
+    $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
+    $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
+    if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
+        Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
+        $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
+    }
+}
+
+# Try download NuGet.exe if not exists
+if (!(Test-Path $NUGET_EXE)) {
+    Write-Verbose -Message "Downloading NuGet.exe..."
+    try {
+        $wc = GetProxyEnabledWebClient
+        $wc.DownloadFile($NUGET_URL, $NUGET_EXE)
+    } catch {
+        Throw "Could not download NuGet.exe."
+    }
+}
+
+# Save nuget.exe path to environment to be available to child processed
+$ENV:NUGET_EXE = $NUGET_EXE
+
+# Restore tools from NuGet?
+if(-Not $SkipToolPackageRestore.IsPresent) {
     Push-Location
-    Set-Location $CAKE_ROOT
+    Set-Location $TOOLS_DIR
 
-    if ([System.String]::IsNullOrWhiteSpace($NuGetFeeds)) {
-        $nugetConfigPath = "$([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::ApplicationData))/NuGet/NuGet.Config"
-        $feeds = Select-Xml -Path $nugetConfigPath -XPath "/configuration/packageSources/add" | Select-Object -ExpandProperty Node | Where-Object -Property protocolVersion -ne "3" | Select-Object -ExpandProperty value
-    } else {
-        $feeds = $NuGetFeeds.Split(';')
+    # Check for changes in packages.config and remove installed tools if true.
+    [string] $md5Hash = MD5HashFile($PACKAGES_CONFIG)
+    if((!(Test-Path $PACKAGES_CONFIG_MD5)) -Or
+      ($md5Hash -ne (Get-Content $PACKAGES_CONFIG_MD5 ))) {
+        Write-Verbose -Message "Missing or changed package.config hash..."
+        Remove-Item * -Recurse -Exclude packages.config,nuget.exe
     }
 
-    $cakeZipPath = Join-Path $TOOLS_DIR "$CAKE_PACKAGE$CAKE_VERSION.nupkg"
+    Write-Verbose -Message "Restoring tools from NuGet..."
+    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
 
-    foreach ($feed in $feeds) {
-        $url = "$($feed.TrimEnd('/'))/package/$CAKE_PACKAGE/$CAKE_VERSION"
-        try {
-            (New-Object System.Net.WebClient).DownloadFile($url, $cakeZipPath)
-            break
-        }
-        catch {
-        }
+    if ($LASTEXITCODE -ne 0) {
+        Throw "An error occurred while restoring NuGet tools."
     }
-
-    if (-not (Test-Path $cakeZipPath)) {
-        Write-Error "Can't restore Cake using NuGet."
-        exit 42
-    } else {
-        try {
-            Unzip $cakeZipPath $CAKE_DIRECTORY
-        } finally {
-            $cakeZipPath | Remove-Item -Force | Out-Null
-        }
+    else
+    {
+        $md5Hash | Out-File $PACKAGES_CONFIG_MD5 -Encoding "ASCII"
     }
+    Write-Verbose -Message ($NuGetOutput | out-string)
 
     Pop-Location
 }
 
-$cakeArguments = @("`"$Script`"")
-$cakeArguments += "-target=`"$Target`""
-$cakeArguments += "-configuration=`"$Configuration`""
-$cakeArguments += "-verbosity=`"$Verbosity`""
+# Restore addins from NuGet
+if (Test-Path $ADDINS_PACKAGES_CONFIG) {
+    Push-Location
+    Set-Location $ADDINS_DIR
 
-$customDockerSource = $false
-$dockerSourcePrefix = "-docker_source="
-$previous = ""
-$current = ""
-foreach ($item in $ScriptArgs) {
-    $current = $item
-    if ($item.StartsWith("-") -and $previous -ne "") {
-        $tmp = $previous
-        $previous = $item
-        $item = $tmp
-    } else {
-        if (-not $item.StartsWith("-")) {
-            $item = "$($previous):$item"
-            $previous = ""
-        } else {
-            $previous = $item
-            continue
-        }
+    Write-Verbose -Message "Restoring addins from NuGet..."
+    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
+
+    if ($LASTEXITCODE -ne 0) {
+        Throw "An error occurred while restoring NuGet addins."
     }
 
-    if ($item.StartsWith($dockerSourcePrefix)) {
-        $customDockerSource = $true
+    Write-Verbose -Message ($NuGetOutput | out-string)
+
+    Pop-Location
+}
+
+# Restore modules from NuGet
+if (Test-Path $MODULES_PACKAGES_CONFIG) {
+    Push-Location
+    Set-Location $MODULES_DIR
+
+    Write-Verbose -Message "Restoring modules from NuGet..."
+    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
+
+    if ($LASTEXITCODE -ne 0) {
+        Throw "An error occurred while restoring NuGet modules."
     }
 
-    $cakeArguments += EscapeParameter -parameter $item
+    Write-Verbose -Message ($NuGetOutput | out-string)
+
+    Pop-Location
 }
 
-if ($previous -ne "") {
-    if ($previous.StartsWith($dockerSourcePrefix)) {
-        $customDockerSource = $true
-    }
-
-    $cakeArguments += EscapeParameter -parameter $current
+# Make sure that Cake has been installed.
+if (!(Test-Path $CAKE_EXE)) {
+    Throw "Could not find Cake.exe at $CAKE_EXE"
 }
 
-if (-not $customDockerSource) {
-    $cakeArguments += "$dockerSourcePrefix`"$DockerSource`""
-}
 
-$cakeArguments += "--settings_skipverification=true"
-$cakeArguments += "--nuget_useinprocessclient=true"
-$cakeArguments += "--nuget_loaddependencies=false"
-$cakeArguments += "--paths_tools=`"$TOOLS_DIR`""
-$cakeArguments += "--paths_addins=`"$ADDINS_DIR`""
-$cakeArguments += "--paths_modules=`"$MODULES_DIR`""
-if (-not ([System.String]::IsNullOrWhiteSpace($NuGetFeeds))) { $cakeArguments += "--nuget_source=`"$NuGetFeeds`"" }
-Write-Output "Running build script's $Script $Target target with $Configuration configuration and $Verbosity logging."
-if ($Verbosity -eq "Diagnostic") {
-    Write-Output "dotnet $CAKE_EXE $cakeArguments"
-}
 
-if (Get-Command dotnet -ErrorAction SilentlyContinue) {
-}
-else {
-    Write-Error "dotnet executable is not found."
-    exit -1
-}
+# Build Cake arguments
+$cakeArguments = @("$Script");
+if ($Target) { $cakeArguments += "-target=$Target" }
+if ($Configuration) { $cakeArguments += "-configuration=$Configuration" }
+if ($Verbosity) { $cakeArguments += "-verbosity=$Verbosity" }
+if ($ShowDescription) { $cakeArguments += "-showdescription" }
+if ($DryRun) { $cakeArguments += "-dryrun" }
+if ($Experimental) { $cakeArguments += "-experimental" }
+if ($Mono) { $cakeArguments += "-mono" }
+$cakeArguments += $ScriptArgs
 
-&dotnet $CAKE_EXE $cakeArguments
+# Start Cake
+Write-Host "Running build script..."
+&$CAKE_EXE $cakeArguments
 exit $LASTEXITCODE
