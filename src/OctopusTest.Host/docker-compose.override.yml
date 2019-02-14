@@ -1,0 +1,22 @@
+﻿version: '3.7'
+
+services:
+  octopustest.host:
+    image: octopustest.host:dev
+    container_name: octopustest.host-dev
+    build:
+      args:
+        - REGISTRY=${R1_DOCKER_REGISTRY}
+        - CAKE_CONFIGURATION=Debug
+    entrypoint: tail -f /dev/null
+    environment:
+      - ConsulUrl=http://${COMPUTERNAME}.${USERDNSDOMAIN}:8500
+      - ServiceDiscovery__Environment=dev-${COMPUTERNAME}
+      - ServiceDiscovery__DynamicHosting__PortRangeMin=0
+      - ServiceDiscovery__DynamicHosting__PortRangeMax=0
+      - ServiceDiscovery__StaticHosting__HostingAddress=+
+      - ServiceDiscovery__StaticHosting__HostingPort=5000
+      - ServiceDiscovery__StaticHosting__DiscoveryAddress=${COMPUTERNAME}.${USERDNSDOMAIN}
+      - ServiceDiscovery__StaticHosting__DiscoveryPort=38822
+    ports:
+      - "38822:5000"

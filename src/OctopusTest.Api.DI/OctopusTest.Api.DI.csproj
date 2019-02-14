@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(AdditionalTargets)" Condition="'$(AdditionalTargets)' != ''" />
+
+  <PropertyGroup>
+    <ProjectGuid>{087A887F-7DD9-4CB3-8694-A33BC97623F8}</ProjectGuid>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <RuntimeFrameworkVersion>2.1.5</RuntimeFrameworkVersion>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Authors>R1 Solutions</Authors>
+    <Company>R1</Company>
+    <Copyright>Copyright © R1</Copyright>
+    <Description></Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <NoWarn>1591</NoWarn>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="2.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OctopusTest.Api\OctopusTest.Api.csproj" />
+  </ItemGroup>
+</Project>

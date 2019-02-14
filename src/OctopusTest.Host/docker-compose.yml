@@ -1,0 +1,11 @@
+﻿version: '3.7'
+
+services:
+  octopustest.host:
+    image: octopustest.host
+    build:
+      context: ../.
+      dockerfile: Dockerfile
+      target: host
+    ports:
+      - "5000"

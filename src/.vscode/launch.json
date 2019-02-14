@@ -1,0 +1,63 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug API (Docker)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "StartDevContainerApi",
+      "postDebugTask": "StopDevContainerApi",
+      "program": "/app/bundle/OctopusTest.Host.dll",
+      "cwd": "/app/bundle",
+      "pipeTransport": {
+        "pipeProgram": "docker",
+        "pipeCwd": "${workspaceRoot}",
+        "pipeArgs": [
+            "exec -i octopustest.host-dev"
+        ],
+        "quoteArgs": false,
+        "debuggerPath": "/vsdbg/vsdbg"
+      },
+      "stopAtEntry": false,
+      "sourceFileMap": {
+        "/app": "${workspaceRoot}"
+      }
+    },
+    {
+      "name": "Debug API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build",
+      "program": "${workspaceFolder}/OctopusTest.Host/bin/Debug/netcoreapp2.1/OctopusTest.Host.dll",
+      "env": {
+        "ServiceDiscovery__Environment": "dev-${env:COMPUTERNAME}"
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "console": "internalConsole"
+    },
+    {
+      "name": "Debug Build Script",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceRoot}/tools/Cake.CoreCLR/Cake.dll",
+      "args": [
+        "${workspaceRoot}/debug.cake",
+        "--debug",
+        "-verbosity=Diagnostic",
+        "-configuration=Release",
+        "-docker_source=${env:R1_DOCKER_REGISTRY}",
+        "--settings_skipverification=true",
+        "--nuget_useinprocessclient=true",
+        "--nuget_loaddependencies=false",
+        "--paths_tools=${workspaceRoot}/tools",
+        "--paths_addins=${workspaceRoot}/tools/Addins",
+        "--paths_modules=${workspaceRoot}/tools/Modules"
+      ],
+      "cwd": "${workspaceRoot}",
+      "stopAtEntry": true,
+      "console": "internalConsole"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="$(AdditionalTargets)" Condition="'$(AdditionalTargets)' != ''" />
+
+  <PropertyGroup>
+    <ProjectGuid>{030DAD5B-156F-46AC-9B43-108E2FDECDEB}</ProjectGuid>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <RuntimeFrameworkVersion>2.1.5</RuntimeFrameworkVersion>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Authors>R1 Solutions</Authors>
+    <Company>R1</Company>
+    <Copyright>Copyright © R1</Copyright>
+    <Description></Description>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <NoWarn>1591</NoWarn>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+</Project>

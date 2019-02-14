@@ -1,0 +1,77 @@
+{
+  "version": "2.0.0",
+  "windows": {
+    "options": {
+      "shell": {
+        "executable": "C:\\Program Files\\PowerShell\\6\\pwsh.exe",
+        "args": [
+          "-NoProfile",
+          "-Command"
+        ]
+      }
+    }
+  },
+  "linux": {
+    "options": {
+      "shell": {
+        "executable": "/usr/bin/pwsh",
+        "args": [
+            "-NoProfile",
+            "-Command"
+          ]
+      }
+    }
+  },
+  "osx": {
+    "options": {
+      "shell": {
+        "executable": "/usr/local/bin/pwsh",
+        "args": [
+            "-NoProfile",
+            "-Command"
+          ]
+      }
+    }
+  },
+  "tasks": [
+    {
+      "label": "StartDevContainerApi",
+      "type": "shell",
+      "command": "docker-compose -f OctopusTest.Host/docker-compose.yml -f OctopusTest.Host/docker-compose.override.yml up --build -d"
+    },
+    {
+      "label": "StopDevContainerApi",
+      "type": "shell",
+      "command": "docker-compose -f OctopusTest.Host/docker-compose.yml -f OctopusTest.Host/docker-compose.override.yml down"
+    },
+    {
+      "label": "Build",
+      "type": "shell",
+      "command": "./build.ps1 -Target Build -Configuration Debug",
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Test",
+      "type": "shell",
+      "command": "./build.ps1 -Target Test -Configuration Debug",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "./build.ps1 -Target Clean -Configuration Debug"
+    },
+    {
+      "label": "Rebuild",
+      "type": "shell",
+      "command": "./build.ps1 -Target Rebuild -Configuration Debug"
+    }
+  ]
+}
