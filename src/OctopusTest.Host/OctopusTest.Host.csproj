@@ -71,6 +71,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.App" Version="2.1.5" />
+    <PackageReference Include="OctoPack" Version="3.6.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="R1.Common.WebApiCore" Version="2.2.0" />
     <PackageReference Include="R1.Common.WebApiCore.Metrics" Version="2.2.0" />
     <PackageReference Include="R1.Common.ClientSniffer" Version="3.0.0" />
