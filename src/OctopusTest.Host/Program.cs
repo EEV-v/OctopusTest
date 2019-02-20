@@ -18,7 +18,7 @@ namespace OctopusTest.Host
 #endif
 
 #pragma warning disable IDE1006 // Naming Styles
-        public static async Task Main(string[] args)
+        public static void Main(string[] args)
 #pragma warning restore IDE1006 // Naming Styles
         {
             while (true)
