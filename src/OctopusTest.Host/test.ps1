@@ -43,7 +43,7 @@ https://cakebuild.net
 Param(
     [string[]]$ScriptArgs
 )
-
+Write-Host "ХУЙ"
 Write-Host $ScriptArgs
 
 exit $LASTEXITCODE
