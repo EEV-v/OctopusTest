@@ -21,8 +21,7 @@ namespace OctopusTest.Host
         public static void Main(string[] args)
 #pragma warning restore IDE1006 // Naming Styles
         {
-            while (true)
-            { }
+            return;
             //var host = CreateAppBuilder(args);
 
             //await host.AsApp()
