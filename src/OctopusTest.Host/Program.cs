@@ -21,11 +21,13 @@ namespace OctopusTest.Host
         public static async Task Main(string[] args)
 #pragma warning restore IDE1006 // Naming Styles
         {
-            var host = CreateAppBuilder(args);
+            while (true)
+            { }
+            //var host = CreateAppBuilder(args);
 
-            await host.AsApp()
-                      .WithDiscoveryRegistration()
-                      .RunAppAsync();
+            //await host.AsApp()
+            //          .WithDiscoveryRegistration()
+            //          .RunAppAsync();
         }
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
