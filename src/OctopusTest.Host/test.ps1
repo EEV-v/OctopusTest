@@ -44,8 +44,6 @@ Param(
     [string[]]$ScriptArgs
 )
 Write-Host "FUCK"
-Write-Host $ScriptArgs.Length
-if( $ScriptArgs.Length -gt 0) {
-    Write-Host $ScriptArgs.Get(0)
-}
+Write-Host $ScriptArgs
+
 exit $LASTEXITCODE
